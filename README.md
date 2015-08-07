@@ -20,7 +20,7 @@ npm install angular-social-login
 ### via bower
 
 ```shell
-bower install angular-resource
+bower install angular-social-login
 ```
 
 ### configure installation
