@@ -1,0 +1,20 @@
+{
+  "name": "angular-social-login",
+  "version": "0.0.1",
+  "homepage": "https://github.com/Paldom/angular-social-login",
+  "authors": [
+    "paldom"
+  ],
+  "description": "Angular Social Authentication (for PhoneGap/Cordova)",
+  "main": "./angular-social-login.js",
+  "keywords": [
+    "angular",
+    "social",
+    "facebook",
+    "fb",
+    "google",
+    "phonegap",
+    "cordova"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,236 @@
+/*!
+ * ngSocialLogin
+ */
+
+(function (window, angular, undefined) {
+
+    'use strict';
+
+    angular.module('ngSocialLogin', [
+        'ngSocialLogin.facebook',
+        'ngSocialLogin.google',
+        'ngSocialLogin.phonegap'
+    ]);
+
+    angular.module('ngSocialLogin.google', [])
+
+        .provider('$googleDefaults', function () {
+            var defaults,
+                self;
+
+            defaults = {
+                client_id: '',
+                client_secret: '',
+                redirect_uri: 'http://localhost',
+                scope: 'profile'
+            };
+
+
+            self = {
+                useConfig: function (config) {
+                    angular.extend(defaults, config);
+                },
+                $get: function () {
+                    return {
+                        defaults: defaults
+                    };
+                }
+            };
+
+            return self;
+        })
+
+        .factory('$googleAuth', ['$q', '$http', '$googleDefaults',
+                    function ($q, $http, $googleDefaults) {
+
+                var self;
+
+                self = {
+
+                    getAuthURL: function (authConfig) {
+                        var url = 'https://accounts.google.com/o/oauth2/auth?',
+                            config = authConfig || {
+                                client_id: $googleDefaults.defaults.client_id,
+                                redirect_uri: $googleDefaults.defaults.redirect_uri,
+                                response_type: 'code',
+                                scope: $googleDefaults.defaults.scope
+                            },
+                            params = [];
+
+                        angular.forEach(config, function (value, key) {
+                            params[params.length] = encodeURIComponent(key) + '=' + encodeURIComponent(value);
+                        });
+
+                        return url + params.join('&');
+                    },
+
+                    getAccessToken: function (authCode, customConfig, customURL) {
+                        var q = $q.defer(),
+                            url = customURL || 'https://accounts.google.com/o/oauth2/token',
+                            config = customConfig || {
+                                code: authCode,
+                                client_id: $googleDefaults.defaults.client_id,
+                                client_secret: $googleDefaults.defaults.client_secret,
+                                redirect_uri: $googleDefaults.defaults.redirect_uri,
+                                grant_type: 'authorization_code'
+                            };
+
+                        config.code = config.code || authCode;
+
+                        $http({
+                            method: "POST",
+                            url: url,
+                            data: config
+                        })
+                            .success(function (data, status, headers, config) {
+                                q.resolve(data);
+                            })
+                            .error(function (data, status, headers, config) {
+                                q.reject("err");
+                            });
+
+                        return q.promise;
+                    }
+
+                };
+
+                return self;
+
+            }]);
+    
+    angular.module('ngSocialLogin.facebook', [])
+    
+        .provider('$facebookDefaults', function () {
+                var defaults,
+                    self;
+
+                defaults = {
+                    client_id: '',
+                    redirect_uri: 'https://www.facebook.com/connect/login_success.html',
+                    scope: 'email,read_stream,publish_actions'
+                };
+
+
+                self = {
+                    useConfig: function (config) {
+                        angular.extend(defaults, config);
+                    },
+                    $get: function () {
+                        return {
+                            defaults: defaults
+                        };
+                    }
+                };
+
+                return self;
+            })
+
+        .factory('$facebookAuth', ['$q', '$http', '$facebookDefaults',
+                    function ($q, $http, $facebookDefaults) {
+
+                var self;
+
+                self = {
+
+                    getAuthURL: function (authConfig) {
+                        var url = 'https://www.facebook.com/dialog/oauth?',
+                            config = authConfig || {
+                                client_id: $facebookDefaults.defaults.client_id,
+                                redirect_uri: $facebookDefaults.defaults.redirect_uri,
+                                response_type: 'token',
+                                scope: $facebookDefaults.defaults.scope
+                            },
+                            params = [];
+
+                        angular.forEach(config, function (value, key) {
+                            params[params.length] = encodeURIComponent(key) + '=' + encodeURIComponent(value);
+                        });
+
+                        return url + params.join('&');
+                    }
+
+                };
+
+                return self;
+
+            }]);
+
+    angular.module('ngSocialLogin.phonegap', [])
+
+        .factory('$socialAuthCordova', ['$q', '$http', '$googleAuth', '$facebookAuth',
+                        function ($q, $http, $googleAuth, $facebookAuth) {
+
+                var self;
+
+                self = {
+                    
+                    loginGoogle: function (authConfig, customConfig, customURL) {
+                        return self.login('google', authConfig, customConfig, customURL);
+                    },
+                    
+                    loginFacebook: function (authConfig, customConfig, customURL) {
+                        return self.login('facebook', authConfig, customConfig, customURL);
+                    },
+
+                    login: function (site, authConfig, customConfig, customURL) {
+
+                        var q = $q.defer(),
+                            url,
+                            ref;
+                        
+                        switch(site) {
+                            case 'google':
+                                url = $googleAuth.getAuthURL(authConfig);
+                                break;
+                            case 'facebook':
+                                url = $facebookAuth.getAuthURL(authConfig);
+                                break;
+                            default:
+                                q.reject("Social site not set!");
+                                break;
+                        }
+                        
+                        ref = window.open(url, '_blank', 'location=no,toolbar=no');
+
+                        ref.addEventListener('loadstart', function (event) {
+
+                            var code = /\?code=(.+)$/.exec(event.url),
+                                error = /\?error=(.+)$/.exec(event.url),
+                                access_token = /access_token=(.*?)&/.exec(event.url);;
+
+                            if (error) {
+                                ref.close();
+                                q.reject(error);
+                            }
+
+                            if (code) {
+
+                                $googleAuth.getAccessToken(code[1].split('&')[0], customConfig, customURL)
+                                    .then(function (accessTokenObj) {
+                                        ref.close();
+                                        q.resolve(accessTokenObj);
+                                    }, function (error) {
+                                        ref.close();
+                                        q.reject(error);
+                                    });
+
+                            }
+                            
+                            if (access_token) {
+                                ref.close();
+                                q.resolve(access_token[0]);
+                            }
+                            
+                            
+                        });
+
+                        return q.promise;
+                    }
+
+                };
+
+                return self;
+
+            }]);
+
+})(window, window.angular);
